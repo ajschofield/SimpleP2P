@@ -34,7 +34,8 @@ int create_socket()
     if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
         perror("There was an issue binding the socket.");
-        return 1;
+        close(sockfd);
+        return -1;
     }
 
     printf("Socket is now bound to port %d\n", rand_port);
