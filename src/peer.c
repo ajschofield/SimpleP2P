@@ -19,7 +19,7 @@ void listen_for_connections(int sockfd)
     // Listen for any incoming connections.
     if (listen(sockfd, 3) != 0)
     {
-        perror("listen failed");
+        perror("There was an error whilst listening for connections.");
         exit(EXIT_FAILURE);
     }
 }
