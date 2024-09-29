@@ -23,7 +23,7 @@ int create_socket()
     if (sockfd < 0)
     {
         perror("There was an issue creating the socket.");
-        return 1;
+        return -1;
     }
 
     // Then, initialise address structure.
