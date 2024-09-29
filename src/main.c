@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include "socket.h"
 #include "peer.h"
+#include "discovery.h"
 
 int main(void)
 {
@@ -14,6 +15,10 @@ int main(void)
         fprintf(stderr, "Socket creation failed.");
         exit(EXIT_FAILURE);
     }
+
+    listen_for_broadcasts();
+
+    send_broadcast();
 
     listen_for_connections(sockfd);
 
