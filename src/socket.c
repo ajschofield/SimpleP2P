@@ -8,7 +8,7 @@
 #define MIN_PORT 1024
 #define MAX_PORT 65535
 
-int socket()
+int create_socket()
 {
     int sockfd;
     struct sockaddr_in server_addr;
