@@ -5,35 +5,91 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <time.h>
 #include "socket.h"
 
-// Set a max size for the messages so that we don't overflow the buffer.
-#define MAX_BUFFER 1024
+#define MIN_PORT 49152
+#define MAX_PORT 65535
+#define MAX_ATTEMPTS 10
 
-void listen_for_connections(int sockfd)
+int negotiate_port(int socket_fd)
 {
-    struct sockaddr_in client_addr;
-    int addrlen = sizeof(client_addr);
-    char buffer[MAX_BUFFER] = {0};
+    srand(time(NULL));
+    char buffer[256];
+    int negotiated_port;
 
-    // Listen for any incoming connections.
-    if (listen(sockfd, 3) != 0)
+    for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
     {
-        perror("There was an error whilst listening for connections.");
-        exit(EXIT_FAILURE);
+        negotiated_port = (rand() % (MAX_PORT - MIN_PORT + 1)) + MIN_PORT;
+        // Send
+        snprintf(buffer, sizeof(buffer), "PORT_PROPOSAL:%d", negotiated_port);
+        if (send(socket_fd, buffer, strlen(buffer), 0) < 0)
+        {
+            perror("Failed to send port proposal");
+            return -1;
+        }
+
+        // Receive
+        memset(buffer, 0, sizeof(buffer));
+        if (recv(socket_fd, buffer, sizeof(buffer) - 1, 0) < 0)
+        {
+            perror("Failed to receive port confirmation");
+            return -1;
+        }
+
+        if (strncmp(buffer, "PORT_ACCEPT", 11) == 0)
+        {
+            printf("Port %d accepted\n", negotiated_port);
+            return negotiated_port;
+        }
     }
 
-    printf("Listening for incoming connections...\n");
+    printf("Failed to negotiatae a port after %d attempts\n", MAX_ATTEMPTS);
+    return -1;
+}
 
-    int incoming = accept(sockfd, (struct sockaddr *)&client_addr, (socklen_t *)&addrlen);
+int establish_connection(struct sockaddr_in peer_addr)
+{
+    int socket_fd;
 
-    if (incoming < 0)
+    if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
-        perror("There was an error whilst accepting the connection.");
-        exit(EXIT_FAILURE);
+        perror("Failed to create the TCP socket required for communication");
+        return -1;
     }
 
-    printf("Connection accepted from %s:%d\n",
-           inet_ntoa(client_addr.sin_addr),
-           ntohs(client_addr.sin_port));
+    if (connect(socket_fd, (struct sockaddr *)&peer_addr, sizeof(peer_addr)) < 0)
+    {
+        perror("Failed to connect to the peer");
+        close(socket_fd);
+        return -1;
+    }
+
+    printf("Connection with peer established. Negotiating port...\n");
+
+    int negotiated_port = negotiate_port(socket_fd);
+    if (negotiated_port < 0)
+    {
+        close(socket_fd);
+        return -1;
+    }
+
+    close(socket_fd);
+
+    peer_addr.sin_port = htons(negotiated_port);
+    if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("Failed to create socket for the negotiated port");
+        return -1;
+    }
+
+    if (connect(socket_fd, (struct sockaddr *)&peer_addr, sizeof(peer_addr)) < 0)
+    {
+        perror("Failed to connect to the peer on the negotiated port");
+        close(socket_fd);
+        return -1;
+    }
+
+    printf("Connection established on port %d\n", negotiated_port);
+    return socket_fd;
 }
