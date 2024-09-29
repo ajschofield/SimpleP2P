@@ -1,6 +1,6 @@
 #ifndef SOCKET_H
 #define SOCKET_H
 
-int socket();
+int create_socket();
 
 #endif
