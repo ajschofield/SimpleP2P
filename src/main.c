@@ -15,5 +15,7 @@ int main(void)
         exit(EXIT_FAILURE);
     }
 
+    listen_for_connections(sockfd);
+
     return 0;
 }
