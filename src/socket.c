@@ -1,5 +1,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <stdio.h>
 
 int main()
 {
@@ -11,7 +12,7 @@ int main()
     if (sockfd < 0)
     {
         perror("There was an issue creating the socket.");
-        return 1
+        return 1;
     }
 
     // Then, initialise address structure.
@@ -19,5 +20,5 @@ int main()
     server_addr.sin_port = htons(8080);
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
-    return 0
+    return 0;
 }
