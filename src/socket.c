@@ -39,7 +39,5 @@ int create_socket()
 
     printf("Socket is now bound to port %d\n", rand_port);
 
-    close(sockfd);
-
     return 0;
 }
