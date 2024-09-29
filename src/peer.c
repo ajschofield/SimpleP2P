@@ -22,4 +22,18 @@ void listen_for_connections(int sockfd)
         perror("There was an error whilst listening for connections.");
         exit(EXIT_FAILURE);
     }
+
+    printf("Listening for incoming connections...\n");
+
+    int incoming = accept(sockfd, (struct sockaddr *)&client_addr, (socklen_t *)&addrlen);
+
+    if (incoming < 0)
+    {
+        perror("There was an error whilst accepting the connection.");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Connection accepted from %s:%d\n",
+           inet_ntoa(client_addr.sin_addr),
+           ntohs(client_addr.sin_port));
 }
