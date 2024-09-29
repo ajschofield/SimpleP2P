@@ -1,7 +1,8 @@
 #ifndef DISCOVERY_H
 #define DISCOVERY_H
 
-void listen_for_broadcasts(void);
-void send_broadcast(void);
+#include <netinet/in.h>
+
+struct sockaddr_in discover_peer(void);
 
 #endif
