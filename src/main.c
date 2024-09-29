@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "socket.h"
+#include "peer.h"
 
 int main(void)
 {
