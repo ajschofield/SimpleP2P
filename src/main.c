@@ -14,4 +14,6 @@ int main(void)
         fprintf(stderr, "Socket creation failed.");
         exit(EXIT_FAILURE);
     }
+
+    return 0;
 }
