@@ -80,3 +80,39 @@ void listen_for_broadcasts(void)
 
     close(sockfd);
 }
+
+void send_broadcast(void)
+{
+    int sockfd;
+    struct sockaddr_in addr;
+    char *message = "Peer available";
+    int opt = 1;
+
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+    {
+        perror("There was an issue creating the UDP socket for broadcasts");
+        exit(EXIT_FAILURE);
+    }
+
+    if (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &opt, sizeof(opt)) < 0)
+    {
+        perror("Failed to set SO_BROADCAST");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(BROADCAST_PORT);
+    addr.sin_addr.s_addr = inet_addr(BROADCAST_IP);
+
+    if (sendto(sockfd, message, strlen(message), 0, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+    {
+        perror("There was an issue sending the broadcast message");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Broadcast message sent.\n");
+
+    close(sockfd);
+}
