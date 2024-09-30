@@ -79,6 +79,14 @@ void log_err(const char *message)
     fprintf(stderr, "Error: %s - %s\n", message, strerror(errno));
 }
 
+int make_socket_non_blocking(int sock)
+{
+    int flags = fcntl(sock, F_GETFL, 0);
+    if (flags == -1)
+        return -1;
+    return fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+}
+
 int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
 {
     int listen_sock, connect_sock;
@@ -127,14 +135,14 @@ int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
         return -1;
     }
 
-    fcntl(listen_sock, F_SETFL, O_NONBLOCK);
-    fcntl(connect_sock, F_SETFL, O_NONBLOCK);
+    make_socket_non_blocking(listen_sock);
+    make_socket_non_blocking(connect_sock);
 
     if (connect(connect_sock, (struct sockaddr *)&peer_addr, sizeof(peer_addr)) < 0)
     {
         if (errno != EINPROGRESS)
         {
-            log_err("Failed to connect to peer");
+            log_err("Failed to initiate connection to peer");
             close(listen_sock);
             close(connect_sock);
             return -1;
@@ -156,16 +164,25 @@ int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
         if (result < 0)
         {
             log_err("Select failed");
-            close(listen_sock);
-            close(connect_sock);
-            return -1;
+            break;
         }
         else if (result == 0)
         {
-            log_err("Connection attempt timed out");
+            fprintf(stderr, "Connection attempt %d timed out\n", attempt + 1);
+            continue;
+        }
+
+        if (FD_ISSET(connect_sock, &write_fds))
+        {
+            int error = 0;
+            socklen_t len = sizeof(error);
+            if (getsockopt(connect_sock, SOL_SOCKET, SO_ERROR, &error, &len) < 0 || error != 0)
+            {
+                log_err("Connection failed");
+                continue;
+            }
             close(listen_sock);
-            close(connect_sock);
-            return -1;
+            return connect_sock;
         }
 
         if (FD_ISSET(listen_sock, &read_fds))
@@ -175,7 +192,7 @@ int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
             {
                 if (errno != EWOULDBLOCK && errno != EAGAIN)
                 {
-                    log_err("accept failed");
+                    log_err("Accept failed");
                     break;
                 }
                 continue;
