@@ -120,6 +120,8 @@ int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
         return -1;
     }
 
+    printf("Listening for incoming connections on port %d\n", INIT_PORT);
+
     connect_sock = create_tcp_socket();
     if (connect_sock < 0)
     {
@@ -129,6 +131,9 @@ int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
 
     make_socket_non_blocking(listen_sock);
     make_socket_non_blocking(connect_sock);
+
+    printf("Attempting to connect to peer at %s:%d\n",
+           inet_ntoa(peer_addr.sin_addr), ntohs(peer_addr.sin_port));
 
     if (connect(connect_sock, (struct sockaddr *)&peer_addr, sizeof(peer_addr)) < 0)
     {
@@ -175,9 +180,9 @@ int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
         {
             int error = 0;
             socklen_t len = sizeof(error);
-            if (getsockopt(connect_sock, SOL_SOCKET, SO_ERROR, &error, &len) < 0 || error != 0)
+            if (getsockopt(connect_sock, SOL_SOCKET, SO_ERROR, &error, &len) < 0)
             {
-                log_err("Connection failed");
+                log_err("getsockopt failed");
                 continue;
             }
             printf("Outgoing connection established successfully.\n");
