@@ -139,6 +139,13 @@ int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
             close(connect_sock);
             return -1;
         }
+        printf("Connection in progress...\n");
+    }
+    else
+    {
+        printf("Connection established immediately\n");
+        close(listen_sock);
+        return connect_sock;
     }
 
     for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
@@ -173,6 +180,7 @@ int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
                 log_err("Connection failed");
                 continue;
             }
+            printf("Outgoing connection established successfully.\n");
             close(listen_sock);
             return connect_sock;
         }
@@ -189,12 +197,15 @@ int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
                 }
                 continue;
             }
+            printf("Incoming connection accepted.\n");
             close(listen_sock);
             close(connect_sock);
             return new_sock;
         }
     }
 
+    // We shouldn't reach this point!
+    printf("Failed to establish connection after %d attempts\n", MAX_ATTEMPTS);
     close(listen_sock);
     close(connect_sock);
     return -1;
