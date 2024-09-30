@@ -3,6 +3,6 @@
 
 #include <netinet/in.h>
 
-int establish_connection(struct sockaddr_in peer_addr);
+int establish_connection(struct sockaddr_in peer_addr, int discovery_socket);
 
 #endif

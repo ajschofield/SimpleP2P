@@ -5,91 +5,233 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/time.h>
 #include <time.h>
-#include "socket.h"
+#include "discovery.h"
+#include "peer.h"
 
-#define MIN_PORT 1024
+#define INIT_PORT 5000
+#define MIN_PORT 49152
 #define MAX_PORT 65535
+#define TIMEOUT 10
 #define MAX_ATTEMPTS 10
+
+int create_tcp_socket()
+{
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock == -1)
+    {
+        perror("socket creation failed");
+        return -1;
+    }
+    return sock;
+}
+
+int make_socket_non_blocking(int sock)
+{
+    int flags = fcntl(sock, F_GETFL, 0);
+    if (flags == -1)
+        return -1;
+    return fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+}
 
 int negotiate_port(int socket_fd)
 {
     srand(time(NULL));
     char buffer[256];
-    int negotiated_port;
+    int proposed_port;
 
     for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
     {
-        negotiated_port = (rand() % (MAX_PORT - MIN_PORT + 1)) + MIN_PORT;
-        // Send
-        snprintf(buffer, sizeof(buffer), "PORT_PROPOSAL:%d", negotiated_port);
+        proposed_port = (rand() % (MAX_PORT - MIN_PORT + 1)) + MIN_PORT;
+
+        snprintf(buffer, sizeof(buffer), "PORT_PROPOSAL:%d", proposed_port);
         if (send(socket_fd, buffer, strlen(buffer), 0) < 0)
         {
             perror("Failed to send port proposal");
             return -1;
         }
 
-        // Receive
         memset(buffer, 0, sizeof(buffer));
         if (recv(socket_fd, buffer, sizeof(buffer) - 1, 0) < 0)
         {
-            perror("Failed to receive port confirmation");
+            perror("Failed to receive port proposal response");
             return -1;
         }
 
         if (strncmp(buffer, "PORT_ACCEPT", 11) == 0)
         {
-            printf("Port %d accepted\n", negotiated_port);
-            return negotiated_port;
+            printf("Port %d accepted\n", proposed_port);
+            return proposed_port;
         }
+
+        printf("Port %d rejected, trying again...\n", proposed_port);
     }
 
-    printf("Failed to negotiatae a port after %d attempts\n", MAX_ATTEMPTS);
+    printf("Failed to negotiate a port after %d attempts\n", MAX_ATTEMPTS);
     return -1;
 }
 
-int establish_connection(struct sockaddr_in peer_addr)
+int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
 {
-    int socket_fd;
+    int listen_sock, connect_sock;
+    struct sockaddr_in my_addr;
+    fd_set read_fds, write_fds;
+    struct timeval tv;
+    int max_fd, result;
 
-    if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    close(discovery_socket);
+
+    listen_sock = create_tcp_socket();
+    if (listen_sock < 0)
+        return -1;
+
+    int reuse = 1;
+    if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
     {
-        perror("Failed to create the TCP socket required for communication");
+        perror("setsockopt(SO_REUSEADDR) failed");
+        close(listen_sock);
         return -1;
     }
 
-    if (connect(socket_fd, (struct sockaddr *)&peer_addr, sizeof(peer_addr)) < 0)
+    my_addr.sin_family = AF_INET;
+    my_addr.sin_addr.s_addr = INADDR_ANY;
+    my_addr.sin_port = htons(INIT_PORT);
+
+    if (bind(listen_sock, (struct sockaddr *)&my_addr, sizeof(my_addr)) < 0)
     {
-        perror("Failed to connect to the peer");
-        close(socket_fd);
+        perror("bind failed");
+        close(listen_sock);
         return -1;
     }
 
-    printf("Connection with peer established. Negotiating port...\n");
-
-    int negotiated_port = negotiate_port(socket_fd);
-    if (negotiated_port < 0)
+    if (listen(listen_sock, 1) < 0)
     {
-        close(socket_fd);
+        perror("listen failed");
+        close(listen_sock);
         return -1;
     }
 
-    close(socket_fd);
-
-    peer_addr.sin_port = htons(negotiated_port);
-    if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    connect_sock = create_tcp_socket();
+    if (connect_sock < 0)
     {
-        perror("Failed to create socket for the negotiated port");
+        close(listen_sock);
         return -1;
     }
 
-    if (connect(socket_fd, (struct sockaddr *)&peer_addr, sizeof(peer_addr)) < 0)
+    if (make_socket_non_blocking(listen_sock) < 0 ||
+        make_socket_non_blocking(connect_sock) < 0)
     {
-        perror("Failed to connect to the peer on the negotiated port");
-        close(socket_fd);
+        perror("failed to set non-blocking");
+        close(listen_sock);
+        close(connect_sock);
         return -1;
     }
 
-    printf("Connection established on port %d\n", negotiated_port);
-    return socket_fd;
+    peer_addr.sin_port = htons(INIT_PORT);
+    result = connect(connect_sock, (struct sockaddr *)&peer_addr, sizeof(peer_addr));
+    if (result < 0 && errno != EINPROGRESS)
+    {
+        perror("connect failed");
+        close(listen_sock);
+        close(connect_sock);
+        return -1;
+    }
+
+    tv.tv_sec = TIMEOUT;
+    tv.tv_usec = 0;
+
+    while (1)
+    {
+        FD_ZERO(&read_fds);
+        FD_ZERO(&write_fds);
+        FD_SET(listen_sock, &read_fds);
+        FD_SET(connect_sock, &write_fds);
+        max_fd = (listen_sock > connect_sock) ? listen_sock : connect_sock;
+
+        result = select(max_fd + 1, &read_fds, &write_fds, NULL, &tv);
+        if (result < 0)
+        {
+            perror("select failed");
+            break;
+        }
+        else if (result == 0)
+        {
+            printf("Connection timed out\n");
+            break;
+        }
+
+        if (FD_ISSET(connect_sock, &write_fds))
+        {
+            close(listen_sock);
+            int negotiated_port = negotiate_port(connect_sock);
+            if (negotiated_port < 0)
+            {
+                close(connect_sock);
+                return -1;
+            }
+            close(connect_sock);
+
+            connect_sock = create_tcp_socket();
+            if (connect_sock < 0)
+                return -1;
+            peer_addr.sin_port = htons(negotiated_port);
+            if (connect(connect_sock, (struct sockaddr *)&peer_addr, sizeof(peer_addr)) < 0)
+            {
+                perror("Failed to connect on negotiated port");
+                close(connect_sock);
+                return -1;
+            }
+            printf("Connected on negotiated port %d\n", negotiated_port);
+            return connect_sock;
+        }
+
+        if (FD_ISSET(listen_sock, &read_fds))
+        {
+            int new_sock = accept(listen_sock, NULL, NULL);
+            if (new_sock < 0)
+            {
+                perror("accept failed");
+                break;
+            }
+            close(listen_sock);
+            close(connect_sock);
+
+            int negotiated_port = negotiate_port(new_sock);
+            if (negotiated_port < 0)
+            {
+                close(new_sock);
+                return -1;
+            }
+            close(new_sock);
+
+            listen_sock = create_tcp_socket();
+            if (listen_sock < 0)
+                return -1;
+            my_addr.sin_port = htons(negotiated_port);
+            if (bind(listen_sock, (struct sockaddr *)&my_addr, sizeof(my_addr)) < 0 ||
+                listen(listen_sock, 1) < 0)
+            {
+                perror("Failed to listen on negotiated port");
+                close(listen_sock);
+                return -1;
+            }
+            new_sock = accept(listen_sock, NULL, NULL);
+            if (new_sock < 0)
+            {
+                perror("accept on negotiated port failed");
+                close(listen_sock);
+                return -1;
+            }
+            close(listen_sock);
+            printf("Accepted connection on negotiated port %d\n", negotiated_port);
+            return new_sock;
+        }
+    }
+
+    close(listen_sock);
+    close(connect_sock);
+    return -1;
 }

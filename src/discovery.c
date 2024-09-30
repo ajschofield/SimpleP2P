@@ -99,10 +99,10 @@ int listen_for_broadcast(int sockfd, struct sockaddr_in *peer_addr)
     return 0;
 }
 
-struct sockaddr_in discover_peer()
+struct peer_info discover_peer()
 {
     int sockfd = create_broadcast_socket();
-    struct sockaddr_in peer_addr;
+    struct peer_info peer = {0};
     struct timeval tv;
 
     if (sockfd < 0)
@@ -122,10 +122,10 @@ struct sockaddr_in discover_peer()
         tv.tv_usec = 0;
         setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
-        if (listen_for_broadcast(sockfd, &peer_addr))
+        if (listen_for_broadcast(sockfd, &peer.addr))
         {
-            close(sockfd);
-            return peer_addr;
+            peer.discovery_socket = sockfd;
+            return peer;
         }
 
         sleep(BROADCAST_INTERVAL);
