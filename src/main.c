@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include "discovery.h"
 #include "peer.h"
+#include "colours.h"
 
 int main()
 {
@@ -11,26 +12,27 @@ int main()
     printf("Name: SimpleP2P\n");
     printf("Author: Alex Schofield\n");
     printf("------------------------\n");
-    printf("Starting peer discovery...\n");
+
+    printf(BYEL "Starting peer discovery...\n" COLOR_RESET);
     struct peer_info peer = discover_peer();
 
-    printf("Peer found at %s:%d\n", inet_ntoa(peer.addr.sin_addr), ntohs(peer.addr.sin_port));
+    printf(BGRN "Peer found at %s:%d\n" COLOR_RESET, inet_ntoa(peer.addr.sin_addr), ntohs(peer.addr.sin_port));
 
-    printf("Attempting to establish connection...\n");
+    printf(CYN "Attempting to establish connection...\n" COLOR_RESET);
     int connection_fd = establish_connection(peer.addr, peer.discovery_socket);
     if (connection_fd < 0)
     {
-        fprintf(stderr, "Failed to establish connection with peer\n");
+        fprintf(stderr, BRED "Failed to establish connection with peer\n" COLOR_RESET);
         return 1;
     }
 
-    printf("Connection established successfully. Socket FD: %d\n", connection_fd);
+    printf(BGRN "Connection established successfully. Socket FD: %d\n" COLOR_RESET, connection_fd);
     printf("Keeping connection open for 10 seconds...\n");
 
     sleep(10);
 
     close(connection_fd);
-    printf("Connection closed.\n");
+    printf(BRED "Connection closed.\n" COLOR_RESET);
 
     return 0;
 }
