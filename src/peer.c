@@ -79,14 +79,6 @@ void log_err(const char *message)
     fprintf(stderr, "Error: %s - %s\n", message, strerror(errno));
 }
 
-int make_socket_non_blocking(int sock)
-{
-    int flags = fcntl(sock, F_GETFL, 0);
-    if (flags == -1)
-        return -1;
-    return fcntl(sock, F_SETFL, flags | O_NONBLOCK);
-}
-
 int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
 {
     int listen_sock, connect_sock;
