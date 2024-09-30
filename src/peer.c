@@ -8,7 +8,7 @@
 #include <time.h>
 #include "socket.h"
 
-#define MIN_PORT 49152
+#define MIN_PORT 1024
 #define MAX_PORT 65535
 #define MAX_ATTEMPTS 10
 
