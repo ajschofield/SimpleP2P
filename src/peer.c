@@ -12,7 +12,7 @@
 #include "discovery.h"
 #include "peer.h"
 
-#define INIT_PORT 5000
+#define INIT_PORT 9090
 #define MIN_PORT 49152
 #define MAX_PORT 65535
 #define TIMEOUT 10

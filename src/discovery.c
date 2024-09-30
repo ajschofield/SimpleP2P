@@ -8,7 +8,7 @@
 #include <sys/time.h>
 #include "discovery.h"
 
-#define BROADCAST_PORT 5000
+#define BROADCAST_PORT 9090
 #define BROADCAST_IP "255.255.255.255"
 #define MAX_BUFFER 1024
 #define LISTEN_TIMEOUT 5
