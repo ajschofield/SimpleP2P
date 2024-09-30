@@ -7,6 +7,10 @@
 
 int main()
 {
+    printf("------------------------\n");
+    printf("Name: SimpleP2P\n");
+    printf("Author: Alex Schofield\n");
+    printf("------------------------\n");
     printf("Starting peer discovery...\n");
     struct peer_info peer = discover_peer();
 
