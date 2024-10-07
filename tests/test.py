@@ -2,7 +2,6 @@ import subprocess
 import sys
 
 from yaspin import yaspin
-import time
 from scapy.all import *
 
 def check_permissions():
