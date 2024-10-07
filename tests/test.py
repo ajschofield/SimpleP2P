@@ -34,7 +34,7 @@ def main():
         start_time = time.time()
         while time.time() - start_time < 30:
             sniffer = sniff(filter="udp and port 9090", timeout=1, count=1)
-            if sniffer and check_broadcast(sniff[0]):
+            if sniffer and check_broadcast(sniffer[0]):
                 spinner.ok("OK")
                 break
         else:
