@@ -11,6 +11,7 @@
 #include <time.h>
 #include "discovery.h"
 #include "peer.h"
+#include "colours.h"
 
 #define INIT_PORT 9090
 #define MIN_PORT 49152
@@ -23,7 +24,7 @@ int create_tcp_socket()
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == -1)
     {
-        perror("TCP socket creation failed");
+        perror(BRED "TCP socket creation failed" COLOR_RESET);
         return -1;
     }
     return sock;
@@ -50,33 +51,33 @@ int negotiate_port(int socket_fd)
         snprintf(buffer, sizeof(buffer), "PORT_PROPOSAL:%d", proposed_port);
         if (send(socket_fd, buffer, strlen(buffer), 0) < 0)
         {
-            perror("Failed to send port proposal");
+            perror(BRED "Failed to send port proposal" COLOR_RESET);
             return -1;
         }
 
         memset(buffer, 0, sizeof(buffer));
         if (recv(socket_fd, buffer, sizeof(buffer) - 1, 0) < 0)
         {
-            perror("Failed to receive port proposal response");
+            perror(BRED "Failed to receive port proposal response" COLOR_RESET);
             return -1;
         }
 
         if (strncmp(buffer, "PORT_ACCEPT", 11) == 0)
         {
-            printf("Port %d accepted\n", proposed_port);
+            printf(BGRN "Port %d accepted\n" COLOR_RESET, proposed_port);
             return proposed_port;
         }
 
-        printf("Port %d rejected, trying again...\n", proposed_port);
+        printf(BYEL "Port %d rejected, trying again...\n" COLOR_RESET, proposed_port);
     }
 
-    printf("Failed to negotiate a port after %d attempts\n", MAX_ATTEMPTS);
+    printf(BRED "Failed to negotiate a port after %d attempts\n" COLOR_RESET, MAX_ATTEMPTS);
     return -1;
 }
 
 void log_err(const char *message)
 {
-    fprintf(stderr, "Error: %s - %s\n", message, strerror(errno));
+    fprintf(stderr, BRED "Error: %s - %s\n" COLOR_RESET, message, strerror(errno));
 }
 
 int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
@@ -120,6 +121,8 @@ int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
         return -1;
     }
 
+    printf("Listening for incoming connections on port %d\n", INIT_PORT);
+
     connect_sock = create_tcp_socket();
     if (connect_sock < 0)
     {
@@ -130,6 +133,9 @@ int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
     make_socket_non_blocking(listen_sock);
     make_socket_non_blocking(connect_sock);
 
+    printf(BMAG "Attempting to connect to peer at %s:%d\n" COLOR_RESET,
+           inet_ntoa(peer_addr.sin_addr), ntohs(peer_addr.sin_port));
+
     if (connect(connect_sock, (struct sockaddr *)&peer_addr, sizeof(peer_addr)) < 0)
     {
         if (errno != EINPROGRESS)
@@ -139,6 +145,13 @@ int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
             close(connect_sock);
             return -1;
         }
+        printf(BYEL "Connection in progress...\n" COLOR_RESET);
+    }
+    else
+    {
+        printf(BGRN "Connection established immediately\n" COLOR_RESET);
+        close(listen_sock);
+        return connect_sock;
     }
 
     for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
@@ -160,7 +173,7 @@ int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
         }
         else if (result == 0)
         {
-            fprintf(stderr, "Connection attempt %d timed out\n", attempt + 1);
+            fprintf(stderr, BRED "Connection attempt %d timed out\n" COLOR_RESET, attempt + 1);
             continue;
         }
 
@@ -168,11 +181,12 @@ int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
         {
             int error = 0;
             socklen_t len = sizeof(error);
-            if (getsockopt(connect_sock, SOL_SOCKET, SO_ERROR, &error, &len) < 0 || error != 0)
+            if (getsockopt(connect_sock, SOL_SOCKET, SO_ERROR, &error, &len) < 0)
             {
-                log_err("Connection failed");
+                log_err("getsockopt failed");
                 continue;
             }
+            printf(BGRN "Outgoing connection established successfully.\n" COLOR_RESET);
             close(listen_sock);
             return connect_sock;
         }
@@ -189,12 +203,15 @@ int establish_connection(struct sockaddr_in peer_addr, int discovery_socket)
                 }
                 continue;
             }
+            printf(BGRN "Incoming connection accepted.\n" COLOR_RESET);
             close(listen_sock);
             close(connect_sock);
             return new_sock;
         }
     }
 
+    // We shouldn't reach this point!
+    printf(BRED "Failed to establish connection after %d attempts\n" COLOR_RESET, MAX_ATTEMPTS);
     close(listen_sock);
     close(connect_sock);
     return -1;
