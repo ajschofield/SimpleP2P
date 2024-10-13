@@ -7,6 +7,13 @@ import time
 from getkey import getkey, keys
 from cffi import FFI
 
+INIT_STRING = """
+------------------------
+Name: SimpleP2P
+Author: Alex Schofield
+------------------------
+"""
+
 ffi = FFI()
 
 ffi.cdef("""
@@ -57,6 +64,8 @@ def discover_and_connect():
 
 
 if __name__ == "__main__":
+    print(INIT_STRING)
+
     process = multiprocessing.Process(target=discover_and_connect)
     process.start()
 
