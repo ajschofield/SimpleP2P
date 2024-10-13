@@ -1,7 +1,8 @@
 import sys
 import os
 import socket
-import threading
+import multiprocessing
+import signal
 import time
 from cffi import FFI
 
@@ -54,4 +55,12 @@ def discover_and_connect():
 
 
 if __name__ == "__main__":
-    discover_and_connect()
+    process = multiprocessing.Process(target=discover_and_connect)
+    process.start()
+    try:
+        while process.is_alive():
+            process.join(1)
+    except KeyboardInterrupt:
+        print("Exiting...")
+        process.terminate()
+        process.join()
