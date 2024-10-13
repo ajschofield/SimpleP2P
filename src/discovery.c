@@ -18,8 +18,13 @@ static char my_id[37];
 
 void generate_unique_id()
 {
-    snprintf(my_id, sizeof(my_id), "%08x-%04x-%04x-%04x-%012x",
-             rand(), rand(), rand(), rand(), rand());
+    uint16_t a = rand();
+    uint16_t b = rand();
+    uint16_t c = rand();
+    uint16_t d = rand();
+
+    snprintf(my_id, sizeof(my_id), "%04x-%04x-%04x-%04x",
+             a, b, c, d);
 }
 
 int create_broadcast_socket()
