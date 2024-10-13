@@ -54,13 +54,20 @@ def discover_and_connect():
         C.close(connection_fd)
 
 
+
 if __name__ == "__main__":
     process = multiprocessing.Process(target=discover_and_connect)
     process.start()
+
     try:
         while process.is_alive():
-            process.join(1)
+            user_input = input("Press 'Q' to quit\n").strip().lower()
+            if user_input == 'q':
+                print("Quitting...")
+                os.kill(process.pid, signal.SIGKILL)
+                break
     except KeyboardInterrupt:
         print("Exiting...")
-        process.terminate()
-        process.join()
+        os.kill(process.pid, signal.SIGKILL)
+
+    process.join()
