@@ -4,6 +4,7 @@ import socket
 import multiprocessing
 import signal
 import time
+from getkey import getkey, keys
 from cffi import FFI
 
 ffi = FFI()
@@ -35,6 +36,7 @@ lib_path = os.path.join(application_path, "build", "lib_simplep2p.so")
 
 C = ffi.dlopen(lib_path)
 
+
 def discover_and_connect():
     peer = C.discover_peer()
 
@@ -50,9 +52,8 @@ def discover_and_connect():
         pass
     else:
         print("Keeping connection alive for 10 seconds...")
-        time.sleep(10)
+        time.sleep(1)
         C.close(connection_fd)
-
 
 
 if __name__ == "__main__":
@@ -60,14 +61,18 @@ if __name__ == "__main__":
     process.start()
 
     try:
+        print("Press 'ESC' to quit.")
         while process.is_alive():
-            user_input = input("Press 'Q' to quit\n").strip().lower()
-            if user_input == 'q':
-                print("Quitting...")
-                os.kill(process.pid, signal.SIGKILL)
-                break
+            key = getkey()
+            if key is not None:
+                if key == keys.ESC:
+                    print("Quitting...")
+                    os.kill(process.pid, signal.SIGKILL)
+                    break
+            time.sleep(0.1)
     except KeyboardInterrupt:
-        print("Exiting...")
+        print("Quitting...")
         os.kill(process.pid, signal.SIGKILL)
 
     process.join()
+    print("Goodbye!")
